@@ -10,7 +10,9 @@ var uniformsNoise, uniformsNormal,
     quadTarget;
 var directionalLight;
 var terrain;
+var uniformsTerrain;
 var lightVal = 0, lightDir = 1;
+var animDelta = 0, animDeltaDir = -1;
 var clock = new THREE.Clock();
 var updateNoise = true;
 var mlib = {};
@@ -20,6 +22,7 @@ var moveForward,
     moveBackward,
     moveLeft,
     moveRight,
+    animateTerrain = false,
     canJump;
 var velocity = new THREE.Vector3();
 
@@ -47,7 +50,7 @@ function init() {
     
     // SCENE (FINAL)
     scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x52828a, 1, 1000);
+    scene.fog = new THREE.Fog(0x52828a, 1, 10000);
     
     initPointerLock();
     initControls();
@@ -99,7 +102,7 @@ function init() {
 
     // TERRAIN SHADER
     var terrainShader = THREE.ShaderTerrain[ "terrain" ];
-    var uniformsTerrain = THREE.UniformsUtils.clone( terrainShader.uniforms );
+    uniformsTerrain = THREE.UniformsUtils.clone( terrainShader.uniforms );
     uniformsTerrain[ 'tNormal' ].value = normalMap.texture;
     uniformsTerrain[ 'uNormalScale' ].value = 3.5;
     uniformsTerrain[ 'tDisplacement' ].value = heightMap.texture;
@@ -230,6 +233,12 @@ function onKeyDown(e) {
       if (canJump === true) velocity.y += 350;
       canJump = false;
       break;
+    case 78:
+      lightDir *= -1;
+      break;
+    case 77:
+      animateTerrain = !animateTerrain;
+      break;
   }
 }
 
@@ -246,13 +255,8 @@ function onKeyUp(e) {
       break;
     case 68:
       moveRight = false;
-      break;
-    case 78:
-          lightDir *= -1;
-          break;
-    case 77: /*M*/  animDeltaDir *= -1; break;
+      break; 
   }
-  updateControls();
 }
 
 function updateControls() {
@@ -269,6 +273,7 @@ function updateControls() {
     if (moveBackward) velocity.z += walkingSpeed * delta;
     if (moveLeft) velocity.x -= walkingSpeed * delta;
     if (moveRight) velocity.x += walkingSpeed * delta;
+    if (animateTerrain) animateTerrainOnM(delta);
 
     controlsPointer.getObject().translateX(velocity.x * delta);
     controlsPointer.getObject().translateY(velocity.y * delta);
@@ -281,7 +286,16 @@ function updateControls() {
     }
   }
 }
-//
+
+function animateTerrainOnM(delta) {
+    uniformsNoise[ "time" ].value += delta * animDelta;
+    uniformsNoise[ "offset" ].value.x += delta * 0.05;
+    quadTarget.material = mlib[ "heightmap" ];
+    renderer.render( sceneRenderTarget, cameraOrtho, heightMap, true );
+    quadTarget.material = mlib[ "normal" ];
+    renderer.render( sceneRenderTarget, cameraOrtho, normalMap, true );
+}
+
 function onWindowResize( event ) {
     SCREEN_WIDTH = window.innerWidth;
     SCREEN_HEIGHT = window.innerHeight;
@@ -309,7 +323,6 @@ function render() {
         scene.fog.color.setHSL( 0.1, 0.5, lightVal );
         renderer.setClearColor( scene.fog.color );
         directionalLight.intensity = THREE.Math.mapLinear( valNorm, 0, 1, 0.1, 1.15 );
-        // uniformsTerrain['uNormalScale'].value = THREE.Math.mapLinear(valNorm, 0, 1, 0.6, 3.5);
         
         if ( updateNoise ) {            
             quadTarget.material = mlib[ 'heightmap' ];
